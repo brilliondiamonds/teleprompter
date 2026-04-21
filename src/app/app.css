@@ -1,0 +1,169 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0a0a0b;
+  --foreground: #f0f0f1;
+  --glass: rgba(17, 17, 19, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --accent: #ed3d63;
+  --accent-glow: rgba(237, 61, 99, 0.2);
+  --glm: #8b5cf6;
+  --glm-glow: rgba(139, 92, 246, 0.2);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  overflow-x: hidden;
+}
+
+.glass-card {
+  background: var(--glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: 1rem;
+}
+
+.glass-input {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  color: white;
+  transition: all 0.2s ease;
+}
+
+.glass-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+
+.checker-background {
+  position: relative;
+}
+
+.checker-background::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background-image: linear-gradient(rgba(237, 61, 99, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(237, 61, 99, 0.05) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(circle at center, black 0%, transparent 80%);
+  z-index: -1;
+  pointer-events: none;
+}
+
+@keyframes glow {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.05); }
+}
+
+.glow-dot {
+  width: 200px;
+  height: 200px;
+  background: var(--accent);
+  filter: blur(100px);
+  position: absolute;
+  z-index: -1;
+  border-radius: 50%;
+  animation: glow 8s infinite ease-in-out;
+}
+
+/* GLM-5.1 Badge */
+.glm-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 0.5rem;
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  color: #a78bfa;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: glm-pulse 3s ease-in-out infinite;
+}
+
+@keyframes glm-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }
+  50% { box-shadow: 0 0 12px 2px rgba(139, 92, 246, 0.15); }
+}
+
+/* ─── Video Studio Styles ─────────────────────────────────────────────────── */
+
+.video-studio-overlay {
+  --video-accent: #10b981;
+  --video-accent-glow: rgba(16, 185, 129, 0.2);
+}
+
+.scene-card {
+  background: var(--glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.scene-card:hover {
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.1);
+}
+
+.timeline-strip {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(16, 185, 129, 0.3) transparent;
+}
+
+.timeline-strip::-webkit-scrollbar {
+  height: 6px;
+}
+
+.timeline-strip::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.timeline-strip::-webkit-scrollbar-thumb {
+  background: rgba(16, 185, 129, 0.3);
+  border-radius: 3px;
+}
+
+.timeline-strip::-webkit-scrollbar-thumb:hover {
+  background: rgba(16, 185, 129, 0.5);
+}
+
+.video-player {
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: black;
+}
+
+.video-player video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Stepper active glow */
+.stepper-active-glow {
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
+}
+
+/* Progress animation for video generation */
+@keyframes video-progress-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.video-progress-bar {
+  animation: video-progress-pulse 2s ease-in-out infinite;
+}
+
