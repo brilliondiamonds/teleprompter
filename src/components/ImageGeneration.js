@@ -7,11 +7,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 const MODELS = [
-    { id: "gpt-image-1-mini", name: "GPT Image Mini", provider: "openai-image-generation" },
-    { id: "gpt-image-1", name: "GPT Image 1", provider: "openai-image-generation" },
-    { id: "dall-e-3", name: "DALL-E 3", provider: "openai-image-generation" },
-    { id: "grok-2-image", name: "Grok 2 Image", provider: "xai" },
-    { id: "google/imagen-4.0", name: "Imagen 4", provider: "google" },
+    { id: "gpt-image-1-mini", name: "GPT Image Mini" },
+    { id: "gpt-image-1", name: "GPT Image 1" },
+    { id: "dall-e-3", name: "DALL-E 3" },
 ];
 
 export default function ImageGeneration({ prompt, useEnhanced = false }) {
@@ -22,7 +20,6 @@ export default function ImageGeneration({ prompt, useEnhanced = false }) {
 
     const setSelectedImageModel = usePromptStore((s) => s.setSelectedImageModel);
 
-    // Sync model selection to store for model-tuned enhancement
     useEffect(() => {
         setSelectedImageModel(selectedModel);
     }, [selectedModel, setSelectedImageModel]);
@@ -33,30 +30,22 @@ export default function ImageGeneration({ prompt, useEnhanced = false }) {
         setError(null);
 
         try {
-            // Wait for Puter.js (loaded with lazyOnload strategy)
-            let puter = window.puter;
-            if (!puter?.ai) {
-                puter = await new Promise((resolve, reject) => {
-                    const start = Date.now();
-                    const check = setInterval(() => {
-                        if (window.puter?.ai) { clearInterval(check); resolve(window.puter); }
-                        else if (Date.now() - start > 10000) { clearInterval(check); reject(new Error("Puter.js not ready")); }
-                    }, 300);
-                });
-            }
-
-            // Find provider for selected model
-            const modelConfig = MODELS.find((m) => m.id === selectedModel);
-
-            // Correct API: txt2img(prompt, options) — NOT txt2img(prompt, modelId)
-            const result = await puter.ai.txt2img(prompt, {
-                model: selectedModel,
-                ...(modelConfig?.provider ? { provider: modelConfig.provider } : {}),
+            const response = await fetch("/api/image/generate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ prompt, model: selectedModel }),
             });
 
-            // Puter returns an HTMLImageElement — get its src
-            const imgSrc = result?.src || (typeof result === "string" ? result : null);
-            if (!imgSrc) throw new Error("No image returned from model.");
+            const data = await response.json();
+
+            if (!response.ok || data.error) {
+                throw new Error(data.error || "Failed to generate image.");
+            }
+
+            const imgSrc = data.imageUrl;
+            if (!imgSrc) throw new Error("No image returned from API.");
+
+            const modelConfig = MODELS.find((m) => m.id === selectedModel);
 
             setImages((prev) => [{
                 src: imgSrc,
@@ -65,8 +54,8 @@ export default function ImageGeneration({ prompt, useEnhanced = false }) {
                 model: modelConfig?.name || selectedModel,
             }, ...prev]);
         } catch (err) {
-            console.error("Puter Error:", err);
-            setError(err.message || "Failed to generate image. Please check your Puter account or connection.");
+            console.error("Image Generation Error:", err);
+            setError(err.message || "Failed to generate image.");
         } finally {
             setLoading(false);
         }
@@ -151,7 +140,6 @@ export default function ImageGeneration({ prompt, useEnhanced = false }) {
                                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                             />
 
-                            {/* Enhanced Badge */}
                             {img.enhanced && (
                                 <div className="absolute top-3 left-3 z-20">
                                     <span className="glm-badge text-[9px]">

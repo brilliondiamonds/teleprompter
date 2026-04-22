@@ -1,6 +1,6 @@
 /**
- * Video Script Generation Service
- * Uses GLM-5.1 via Puter.js to break a prompt into cinematic scenes.
+ * Video Script Generation Service (Client)
+ * Calls /api/video/script — no direct third-party SDK usage.
  */
 import { AppError, ScriptGenerationError, classifyError } from "./errors";
 
@@ -13,85 +13,24 @@ export async function generateVideoScript(prompt) {
         throw new AppError("Prompt is required for script generation.", { code: "VALIDATION_ERROR" });
     }
 
-    // Dynamic import guard — Puter is client-only
-    if (typeof window === "undefined" || !window.puter?.ai) {
-        throw new ScriptGenerationError("AI service is not available. Please reload the page.");
-    }
-
-    const systemPrompt = `You are a cinematic video scriptwriter using CogVideoX. Break the user's concept into 4-6 short scenes for AI video generation.
-
-Return a JSON array where each scene has:
-{
-  "id": "scene_<number>",
-  "title": "<short scene title>",
-  "description": "<what happens in the scene, 1-2 sentences>",
-  "visualPrompt": "<detailed visual description optimized for CogVideoX video generation, include camera movement, lighting, color, atmosphere>",
-  "duration": <seconds, 4-8>,
-  "mood": "<mood word>",
-  "transition": "fade|cut|dissolve|wipe"
-}
-
-Guidelines for visualPrompt:
-- Be extremely specific about visual details
-- Include camera movements (slow pan, zoom in, tracking shot, etc.)
-- Describe lighting conditions explicitly
-- Include atmosphere and particle effects (dust, fog, rain, etc.)
-- Each scene should flow naturally to the next
-- Keep prompts under 200 words each
-
-Return ONLY the JSON array, no markdown fences.`;
-
     try {
-        const messages = [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: prompt },
-        ];
+        const response = await fetch("/api/video/script", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt }),
+        });
 
-        const response = await window.puter.ai.chat(messages, { model: "glm-4" });
+        const data = await response.json();
 
-        const text = typeof response === "string"
-            ? response
-            : response?.message?.content || response?.text || response?.toString();
-
-        if (!text) {
-            throw new ScriptGenerationError("GLM returned an empty response for script generation.");
+        if (!response.ok || data.error) {
+            throw new ScriptGenerationError(data.error || `Server error (${response.status})`);
         }
 
-        // Parse JSON, stripping code fences
-        let cleaned = text.trim();
-        const fenceMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/);
-        if (fenceMatch) {
-            cleaned = fenceMatch[1].trim();
+        if (!data.scenes || !Array.isArray(data.scenes) || data.scenes.length === 0) {
+            throw new ScriptGenerationError("No scenes were generated. Please try a different prompt.");
         }
 
-        let scenes;
-        try {
-            scenes = JSON.parse(cleaned);
-        } catch {
-            throw new ScriptGenerationError("Failed to parse script from GLM response. Please try again.");
-        }
-
-        if (!Array.isArray(scenes) || scenes.length === 0) {
-            throw new ScriptGenerationError("GLM returned no scenes. Please try a different prompt.");
-        }
-
-        // Validate each scene has required fields
-        const requiredFields = ["id", "title", "description", "visualPrompt", "duration", "mood", "transition"];
-        for (const scene of scenes) {
-            for (const field of requiredFields) {
-                if (!scene[field] && field !== "duration") {
-                    console.warn(`[VideoScript] Scene ${scene.id || "unknown"} missing field: ${field}`);
-                }
-            }
-            // Ensure id exists
-            if (!scene.id) {
-                scene.id = `scene_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-            }
-            // Clamp duration
-            scene.duration = Math.max(2, Math.min(10, Number(scene.duration) || 6));
-        }
-
-        return scenes;
+        return data.scenes;
     } catch (err) {
         if (err instanceof ScriptGenerationError || err instanceof AppError) {
             throw err;

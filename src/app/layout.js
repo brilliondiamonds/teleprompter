@@ -1,5 +1,3 @@
-import Script from "next/script";
-
 export const metadata = {
   title: "Teleprompter | Agency Prompt Factory",
   description: "Dynamic AI Image Prompt Engineering for Professional Studios.",
@@ -19,12 +17,7 @@ export default function RootLayout({ children }) {
       </head>
       <body>
         {children}
-        <Script
-          src="https://js.puter.com/v2/"
-          strategy="lazyOnload"
-        />
       </body>
     </html>
   );
 }
-
