@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const GLM_MODEL = "glm-4";
+const GLM_MODEL = "glm-5.1";
 
 async function callGLM(messages, options = {}) {
     const apiKey = process.env.GLM_API_KEY || process.env.OPENAI_API_KEY;
