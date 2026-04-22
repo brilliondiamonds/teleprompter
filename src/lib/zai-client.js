@@ -1,140 +1,118 @@
 /**
- * z.ai API Client for CogVideoX Video Generation
- *
- * This client communicates with the z.ai video generation API.
- * The base URL is configurable — swap it below if the endpoint changes.
+ * ZAI Video Generation API Client
+ * Handles submission and polling of CogVideoX video generation jobs.
  */
+import { AppError, VideoGenerationError, ConfigurationError, classifyError } from "./errors";
 
-// ─── Configurable Base URL ───────────────────────────────────────────────────
 const ZAI_BASE_URL = "https://api.z.ai/v1";
-// Alternative endpoints to try if the above doesn't work:
-// const ZAI_BASE_URL = "https://api.zhipuai.ai/v4";
-// const ZAI_BASE_URL = "https://open.bigmodel.cn/api/paas/v4";
-
-const VIDEO_GENERATIONS_ENDPOINT = `${ZAI_BASE_URL}/video/generations`;
-
-const DEFAULT_MODEL = "cogvideox-2";
-const DEFAULT_SIZE = "1280x720";
-const DEFAULT_DURATION = 6;
-const POLL_INTERVAL_MS = 5000;
-const POLL_TIMEOUT_MS = 600000; // 10 minutes
 
 /**
- * Submit a video generation job to z.ai
- * @param {string} prompt - Cinematic prompt for the scene
- * @param {object} options
- * @param {string} [options.model] - Model name
- * @param {string} [options.size] - Resolution string e.g. "1280x720"
- * @param {number} [options.duration] - Duration in seconds
- * @param {string} apiKey - API key (read server-side only)
- * @returns {Promise<{jobId: string, status: string}>}
+ * Validate that the API key is present and not a placeholder.
+ */
+function validateApiKey(apiKey) {
+    if (!apiKey || apiKey === "your_zai_api_key_here" || apiKey.trim() === "") {
+        throw new ConfigurationError(
+            "ZAI_API_KEY is not configured. Add it to your .env.local file.",
+            { details: "Create .env.local in the project root and add: ZAI_API_KEY=your_api_key" }
+        );
+    }
+}
+
+/**
+ * Submit a video generation job to the ZAI API.
  */
 export async function submitVideoJob(prompt, options = {}, apiKey) {
-    if (!apiKey) throw new Error("ZAI_API_KEY is not configured.");
+    validateApiKey(apiKey);
+
+    if (!prompt?.trim()) {
+        throw new AppError("Visual prompt is required.", { code: "VALIDATION_ERROR" });
+    }
+
+    const { model = "cogvideox-2", duration = 6, size = "1280x720" } = options;
 
     const body = {
-        model: options.model || DEFAULT_MODEL,
-        prompt,
-        size: options.size || DEFAULT_SIZE,
-        duration: options.duration || DEFAULT_DURATION,
+        prompt: prompt.trim(),
+        model,
+        duration: Math.max(2, Math.min(10, Number(duration) || 6)),
+        size,
     };
 
-    const response = await fetch(VIDEO_GENERATIONS_ENDPOINT, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(body),
-    });
+    try {
+        const response = await fetch(`${ZAI_BASE_URL}/video/generate`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify(body),
+        });
 
-    if (!response.ok) {
-        const errorText = await response.text().catch(() => "Unknown error");
-        throw new Error(`z.ai API error (${response.status}): ${errorText}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+            const message = data.error || data.message || `API returned status ${response.status}`;
+            if (response.status === 401 || response.status === 403) {
+                throw new ConfigurationError(`ZAI API authentication failed: ${message}`);
+            }
+            if (response.status === 429) {
+                throw new VideoGenerationError(`Rate limited: ${message}. Please wait and try again.`);
+            }
+            throw new VideoGenerationError(message);
+        }
+
+        if (!data.jobId && !data.id) {
+            throw new VideoGenerationError("API did not return a job ID.");
+        }
+
+        return {
+            jobId: data.jobId || data.id,
+            status: data.status || "pending",
+        };
+    } catch (err) {
+        if (err instanceof AppError) throw err;
+        const classified = classifyError(err);
+        throw new VideoGenerationError(`Failed to submit video job: ${classified.message}`);
     }
-
-    const data = await response.json();
-
-    return {
-        jobId: data.id,
-        status: data.status || "processing",
-    };
 }
 
 /**
- * Poll the status of a video generation job
- * @param {string} jobId - The job ID returned by submitVideoJob
- * @param {string} apiKey - API key
- * @returns {Promise<{status: string, videoUrl?: string, error?: string}>}
+ * Poll a video generation job status.
  */
 export async function pollJobStatus(jobId, apiKey) {
-    if (!apiKey) throw new Error("ZAI_API_KEY is not configured.");
-    if (!jobId) throw new Error("Job ID is required.");
+    validateApiKey(apiKey);
 
-    const url = `${VIDEO_GENERATIONS_ENDPOINT}/${jobId}`;
-
-    const response = await fetch(url, {
-        method: "GET",
-        headers: {
-            Authorization: `Bearer ${apiKey}`,
-        },
-    });
-
-    if (!response.ok) {
-        const errorText = await response.text().catch(() => "Unknown error");
-        throw new Error(`z.ai status check error (${response.status}): ${errorText}`);
+    if (!jobId) {
+        throw new AppError("Job ID is required.", { code: "VALIDATION_ERROR" });
     }
 
-    const data = await response.json();
+    try {
+        const response = await fetch(`${ZAI_BASE_URL}/video/status/${encodeURIComponent(jobId)}`, {
+            headers: {
+                "Authorization": `Bearer ${apiKey}`,
+            },
+        });
 
-    const result = {
-        status: data.status || "processing",
-    };
+        const data = await response.json();
 
-    if (data.status === "completed" && data.output?.url) {
-        result.videoUrl = data.output.url;
-        result.duration = data.output.duration;
-    }
-
-    if (data.status === "failed") {
-        result.error = data.error || "Video generation failed.";
-    }
-
-    return result;
-}
-
-/**
- * Wait for a video generation job to complete, polling at regular intervals
- * @param {string} jobId - The job ID
- * @param {string} apiKey - API key
- * @param {function} [onProgress] - Optional callback invoked on each poll with {status, elapsed}
- * @returns {Promise<string>} The video URL when completed
- */
-export async function waitForVideo(jobId, apiKey, onProgress) {
-    const startTime = Date.now();
-
-    while (true) {
-        const elapsed = Date.now() - startTime;
-
-        if (elapsed > POLL_TIMEOUT_MS) {
-            throw new Error("Video generation timed out after 10 minutes.");
+        if (!response.ok) {
+            return {
+                status: "failed",
+                error: data.error || data.message || `Status check failed (${response.status})`,
+            };
         }
 
-        const result = await pollJobStatus(jobId, apiKey);
-
-        if (onProgress) {
-            onProgress({ status: result.status, elapsed });
-        }
-
-        if (result.status === "completed" && result.videoUrl) {
-            return result.videoUrl;
-        }
-
-        if (result.status === "failed") {
-            throw new Error(result.error || "Video generation failed.");
-        }
-
-        // Wait before polling again
-        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+        return {
+            status: data.status || "processing",
+            progress: data.progress || 0,
+            videoUrl: data.videoUrl || data.output?.videoUrl || data.url || null,
+            error: data.error || null,
+        };
+    } catch (err) {
+        if (err instanceof AppError) throw err;
+        const classified = classifyError(err);
+        return {
+            status: "error",
+            error: `Network error: ${classified.message}`,
+        };
     }
 }

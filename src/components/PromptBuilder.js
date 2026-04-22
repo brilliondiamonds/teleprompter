@@ -17,6 +17,7 @@ import PromptAnalysis from "./PromptAnalysis";
 import NeuralInput from "./NeuralInput";
 import QuantumMutator from "./QuantumMutator";
 import VideoStudio from "./VideoStudio";
+import ErrorBoundary from "./ErrorBoundary";
 import { useVideoStore } from "@/store/useVideoStore";
 
 const ENHANCEMENT_MODES = [
@@ -581,7 +582,9 @@ export default function PromptBuilder() {
             </div>
             
             <QuantumMutator />
-            <VideoStudio />
+            <ErrorBoundary>
+                <VideoStudio />
+            </ErrorBoundary>
         </div>
     );
 }

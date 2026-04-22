@@ -38,7 +38,9 @@ export default function VideoStudio() {
         sourcePrompt,
         generateScript,
         startVideoGeneration,
+        regenerateFailed,
         reset,
+        clearError,
         settings,
     } = useVideoStore();
 
@@ -140,7 +142,13 @@ export default function VideoStudio() {
                                     className="mb-6 flex items-center gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm"
                                 >
                                     <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                                    <span>{error}</span>
+                                    <span className="flex-1">{error}</span>
+                                    <button
+                                        onClick={clearError}
+                                        className="text-xs font-bold underline hover:text-red-300 transition-colors"
+                                    >
+                                        Dismiss
+                                    </button>
                                 </motion.div>
                             )}
                         </AnimatePresence>
@@ -369,9 +377,7 @@ export default function VideoStudio() {
 
                                     <div className="flex items-center gap-3">
                                         <button
-                                            onClick={() => {
-                                                startVideoGeneration();
-                                            }}
+                                            onClick={regenerateFailed}
                                             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white/40 text-xs font-bold hover:bg-white/10 transition-all"
                                         >
                                             <RotateCcw className="w-3.5 h-3.5" /> Regenerate Failed

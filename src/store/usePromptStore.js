@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { storage, DEFAULT_MODULE_TYPES } from "@/lib/storage";
+import { storage } from "@/lib/storage";
+import { DEFAULT_MODULE_TYPES } from "@/lib/module-types";
 import { enhancePrompt, analyzePrompt, generateAutoPilotModules, mutateModules } from "@/lib/glm";
 
 export const usePromptStore = create((set, get) => ({
